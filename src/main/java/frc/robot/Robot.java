@@ -7,11 +7,14 @@
 
 package frc.robot;
 
-import edu.wpi.first.wpilibj.AnalogInput;
-import edu.wpi.first.wpilibj.MedianFilter;
-import edu.wpi.first.wpilibj.PWMVictorSPX;
+import com.revrobotics.ColorSensorV3;
+
+import edu.wpi.first.networktables.NetworkTableEntry;
+import edu.wpi.first.wpilibj.I2C;
 import edu.wpi.first.wpilibj.TimedRobot;
-import edu.wpi.first.wpilibj.drive.DifferentialDrive;
+import edu.wpi.first.wpilibj.shuffleboard.Shuffleboard;
+import edu.wpi.first.wpilibj.shuffleboard.ShuffleboardTab;
+import edu.wpi.first.wpilibj.util.Color;
 
 /**
  * This is a sample program demonstrating how to use an ultrasonic sensor and
@@ -19,42 +22,63 @@ import edu.wpi.first.wpilibj.drive.DifferentialDrive;
  */
 
 public class Robot extends TimedRobot {
-  // distance in inches the robot wants to stay from an object
-  private static final double kHoldDistance = 12.0;
 
-  // factor to convert sensor values to a distance in inches
-  private static final double kValueToInches = 0.125;
-
-  // proportional speed constant
-  private static final double kP = 0.05;
-
-  private static final int kLeftMotorPort = 0;
-  private static final int kRightMotorPort = 1;
-  private static final int kUltrasonicPort = 0;
-
-  // median filter to discard outliers; filters over 10 samples
-  private final MedianFilter m_filter = new MedianFilter(10);
-
-  private final AnalogInput m_ultrasonic = new AnalogInput(kUltrasonicPort);
-  private final DifferentialDrive m_robotDrive
-      = new DifferentialDrive(new PWMVictorSPX(kLeftMotorPort),
-      new PWMVictorSPX(kRightMotorPort));
-
+  
+  private ShuffleboardTab dataTab = Shuffleboard.getTab("Sensor");
+  private NetworkTableEntry redEntry, greenEntry, blueEntry, irEntry;
+  Color detectedColor;
+  double IR;
+  
   /**
-   * Tells the robot to drive to a set distance (in inches) from an object
-   * using proportional control.
+   * Change the I2C port below to match the connection of your color sensor
    */
+  private final I2C.Port i2cPort = I2C.Port.kOnboard;
+  /**
+   * A Rev Color Sensor V3 object is constructed with an I2C port as a 
+   * parameter. The device will be automatically initialized with default 
+   * parameters.
+   */
+  private final ColorSensorV3 colorSensor = new ColorSensorV3(i2cPort);
+  
+  public Robot() {
+    redEntry = dataTab
+      .add("colorSensor/red", detectedColor.red)
+      .getEntry();
+    greenEntry = dataTab
+      .add("colorSensor/green", detectedColor.green)
+      .getEntry();
+    blueEntry = dataTab
+      .add("colorSensor/blue", detectedColor.blue)
+      .getEntry();
+    irEntry = dataTab
+      .add("colorSensor/ir", IR)
+      .getEntry();
+  }
+
+
   @Override
   public void teleopPeriodic() {
-    // sensor returns a value from 0-4095 that is scaled to inches
-    // returned value is filtered with a rolling median filter, since ultrasonics
-    // tend to be quite noisy and susceptible to sudden outliers
-    double currentDistance = m_filter.calculate(m_ultrasonic.getValue()) * kValueToInches;
+    /**
+     * The method GetColor() returns a normalized color value from the sensor and can be
+     * useful if outputting the color to an RGB LED or similar. To
+     * read the raw color, use GetRawColor().
+     * 
+     * The color sensor works best when within a few inches from an object in
+     * well lit conditions (the built in LED is a big help here!). The farther
+     * an object is the more light from the surroundings will bleed into the 
+     * measurements and make it difficult to accurately determine its color.
+     */
+    detectedColor = colorSensor.getColor();
 
-    // convert distance error to a motor speed
-    double currentSpeed = (kHoldDistance - currentDistance) * kP;
+    /**
+     * The sensor returns a raw IR value of the infrared light detected.
+     */
+    IR = colorSensor.getIR();
 
-    // drive robot
-    m_robotDrive.arcadeDrive(currentSpeed, 0);
+    redEntry.setDouble(detectedColor.red);
+    greenEntry.setDouble(detectedColor.green);
+    blueEntry.setDouble(detectedColor.blue);
+    irEntry.setDouble(IR);
+
   }
 }
